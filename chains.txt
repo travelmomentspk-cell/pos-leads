@@ -1,0 +1,87 @@
+# One chain or franchise name per line (lowercase). A business whose name contains
+# any of these is rejected, because head office usually dictates their POS system.
+tim hortons
+mcdonald
+starbucks
+subway
+a&w
+wendy's
+burger king
+pizza pizza
+domino's
+pizza hut
+kfc
+popeyes
+harvey's
+swiss chalet
+boston pizza
+dairy queen
+second cup
+timothy's
+mary brown
+freshii
+chipotle
+panera
+nando's
+the keg
+earls
+cactus club
+white spot
+montana's
+east side mario
+the works
+shoppers drug mart
+rexall
+walmart
+costco
+loblaws
+real canadian superstore
+no frills
+metro
+sobeys
+food basics
+freshco
+farm boy
+save-on-foods
+safeway
+iga
+canadian tire
+home depot
+rona
+dollarama
+dollar tree
+7-eleven
+circle k
+couche-tard
+petro-canada
+esso
+shell
+mac's
+hudson's bay
+winners
+marshalls
+homesense
+indigo
+chapters
+lululemon
+aritzia
+roots
+old navy
+gap
+h&m
+zara
+uniqlo
+sport chek
+best buy
+staples
+goodlife
+anytime fitness
+planet fitness
+orangetheory
+snap fitness
+great clips
+supercuts
+sport clips
+lcbo
+beer store
+liquor depot

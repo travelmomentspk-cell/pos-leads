@@ -1,0 +1,71 @@
+# ---------- Daily goal ----------
+target_leads_per_day: 100
+min_score_qualified: 50      # name + phone + address present and score >= this -> Qualified_Leads (email is a bonus, not required)
+review_score_floor: 38       # score between floor and min -> Review_Queue
+
+# ---------- Where to look (Google Maps category x city) ----------
+# The runner rotates through every category/city combination, queries_per_run at a time,
+# so each day covers new ground. Edit freely.
+targets:
+  categories:
+    - restaurant
+    - cafe
+    - bakery
+    - hair salon
+    - barber shop
+    - convenience store
+    - clothing boutique
+    - bubble tea shop
+  cities:
+    - Toronto ON
+    - Mississauga ON
+    - Brampton ON
+    - Ottawa ON
+    - Hamilton ON
+    - Montreal QC
+    - Vancouver BC
+    - Surrey BC
+    - Calgary AB
+    - Edmonton AB
+    - Winnipeg MB
+    - Halifax NS
+queries_per_run: 24
+
+# ---------- Free scraper (gosom/google-maps-scraper, runs on your PC) ----------
+scraper:
+  mode: docker               # docker | binary
+  binary_path: ""            # only for mode: binary, e.g. C:\tools\google-maps-scraper.exe
+  depth: 3                   # scroll depth for category searches (higher = more results, slower)
+  concurrency: 4
+  email: true                # visit each business website to find emails (slower, but needed)
+  lang: en
+  exit_on_inactivity: 3m
+
+# ---------- Extra intent sources ----------
+sources:
+  vancouver_licences:        # City of Vancouver open data, new business licences
+    enabled: true
+    days_back: 45
+    max_records: 150
+    business_type_keywords: [restaurant, cafe, coffee, bakery, retail, food, salon, barber, beauty, bar, pub, store, shop, market, grocery]
+  socrata_licences:          # generic adapter for Calgary / Edmonton / Winnipeg style Socrata portals
+    enabled: false           # fill in dataset_url + fields (see README) then set to true
+    portals: []
+
+# ---------- Website enrichment ----------
+enrich:
+  workers: 8
+  timeout_seconds: 10
+  check_robots: true
+  mx_check: true
+
+# ---------- Output ----------
+paths:
+  out: out
+  state: state
+sheets:
+  # Preferred: the Make scenario "POS Leads: Sheet receiver" (already built, 2 Make operations per push).
+  make_webhook_url: "https://hook.us2.make.com/2jjal3nxdc9iux6nw4vvejhp2eb0nvfg"
+  # Optional fallback: Apps Script web app URL (apps_script/Code.gs). Only used if make_webhook_url is empty.
+  web_app_url: ""
+  push_raw: false

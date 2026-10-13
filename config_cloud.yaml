@@ -1,0 +1,74 @@
+# =====================================================================================
+# CLOUD CONFIG: the one file that controls the GitHub Actions run (run_cloud.py).
+# Edit categories, cities, thresholds and sources here. The Google Sheet dropdowns are refreshed
+# from this file at the end of every run (Lists tab), so new categories appear there by themselves.
+# =====================================================================================
+
+run:
+  default_category: ALL        # a category name from the list below, several separated by commas, or ALL
+  default_city: ALL            # a city from the list below, or ALL
+  min_score: 70                # a lead below this score is rejected and never reaches the Sheet
+  daily_cap: 1000              # ceiling per run only; real volume depends on how many businesses pass the rules
+  queries_per_run: 40          # Google Maps searches per run when category or city is ALL (a GitHub run may last up to ~5 hours)
+  max_review_count: 1500       # more Google reviews than this = too big or chain-like
+  rejected_retry_days: 14      # a rejected business is not looked at again for this many days
+
+quality:
+  require_decision_maker: true   # Owner, Founder, CEO, President, Director or Manager, with a name
+  require_phone: true            # a valid Canadian phone number
+  require_email: true            # a usable email (found on their own website or by the Maps scraper)
+  # A lead missing any required item is NOT written to New Leads. It goes to the Rejected tab with the reason.
+
+sources:
+  google_maps:     {enabled: true, depth: 3}           # business searches (category x city)
+  website_pages:   {enabled: true, workers: 8, timeout_seconds: 10}   # About, Team, Contact pages and schema.org data
+  linkedin_via_google_search:                          # official Google Programmable Search API, only public snippets
+    enabled: true                                      # needs GOOGLE_CSE_KEY and GOOGLE_CSE_CX secrets (free, 100 searches a day)
+    daily_budget: 80
+  provider_complaints: {enabled: false}                # bad reviews about POS/payment/website providers (config_extra.yaml)
+
+# -------------------------------------------------------------------------------------
+# 23 categories. keywords = what is typed into Google Maps, needs = what you can pitch.
+# Switch one off with enabled: false, or copy a line to add a category.
+# -------------------------------------------------------------------------------------
+categories:
+  - {name: "Restaurants",                 enabled: true, keywords: ["restaurant"],                                   needs: [POS, Website, Payment gateway]}
+  - {name: "Cafes",                       enabled: true, keywords: ["cafe"],                                         needs: [POS, Website]}
+  - {name: "Bakeries",                    enabled: true, keywords: ["bakery"],                                       needs: [POS, Website]}
+  - {name: "Hair salons",                 enabled: true, keywords: ["hair salon"],                                   needs: [POS, CRM, Website]}
+  - {name: "Barber shops",                enabled: true, keywords: ["barber shop"],                                  needs: [POS, CRM]}
+  - {name: "Convenience stores",          enabled: true, keywords: ["convenience store"],                            needs: [POS]}
+  - {name: "Clothing boutiques",          enabled: true, keywords: ["clothing boutique"],                            needs: [POS, Website, Payment gateway]}
+  - {name: "Bubble tea shops",            enabled: true, keywords: ["bubble tea shop"],                              needs: [POS, Website]}
+  - {name: "3D printing shops",           enabled: true, keywords: ["3D printing service", "3D printing shop"],      needs: [Website, Payment gateway, CRM]}
+  - {name: "Boutiques and gift shops",    enabled: true, keywords: ["women's clothing boutique", "gift shop"],       needs: [POS, Website, Payment gateway]}
+  - {name: "Clinics",                     enabled: true, keywords: ["walk-in clinic", "dental clinic", "physiotherapy clinic"], needs: [CRM, Website, Payment gateway]}
+  - {name: "Gyms and fitness studios",    enabled: true, keywords: ["gym", "yoga studio", "pilates studio"],         needs: [CRM, POS, Payment gateway]}
+  - {name: "Salons and spas",             enabled: true, keywords: ["nail salon", "day spa", "lash studio"],         needs: [POS, CRM, Website]}
+  - {name: "Cloud and ghost kitchens",    enabled: true, keywords: ["ghost kitchen", "cloud kitchen", "meal prep service"], needs: [POS, Website, Payment gateway]}
+  - {name: "Independent pharmacies",      enabled: true, keywords: ["independent pharmacy", "compounding pharmacy"], needs: [POS, CRM]}
+  - {name: "Pet services",                enabled: true, keywords: ["pet grooming", "pet store"],                    needs: [POS, CRM, Website]}
+  - {name: "Auto repair and detailing",   enabled: true, keywords: ["auto repair shop", "car detailing", "tire shop"], needs: [POS, CRM, Website]}
+  - {name: "Florists",                    enabled: true, keywords: ["florist", "flower shop"],                       needs: [POS, Website, Payment gateway]}
+  - {name: "Specialty food shops",        enabled: true, keywords: ["butcher shop", "health food store", "cheese shop"], needs: [POS, Website]}
+  - {name: "Vape and smoke shops",        enabled: true, keywords: ["vape shop", "smoke shop"],                      needs: [POS, Payment gateway]}
+  - {name: "Cleaning and home services",  enabled: true, keywords: ["cleaning service", "landscaping company", "home renovation contractor"], needs: [CRM, Website, Payment gateway]}
+  - {name: "Tattoo and photo studios",    enabled: true, keywords: ["tattoo studio", "photography studio"],          needs: [CRM, Website, Payment gateway]}
+  - {name: "Tutoring, music and driving schools", enabled: true, keywords: ["tutoring center", "music school", "driving school"], needs: [CRM, Website, Payment gateway]}
+
+cities: [Toronto ON, Mississauga ON, Brampton ON, Ottawa ON, Hamilton ON, London ON, Montreal QC, Quebec City QC,
+         Vancouver BC, Surrey BC, Burnaby BC, Calgary AB, Edmonton AB, Winnipeg MB, Saskatoon SK, Halifax NS]
+exclude_chains: []             # extra names to skip, on top of chains.txt
+score_choices: [60, 65, 70, 75, 80, 85, 90]    # the min-score dropdown in the Sheet
+
+# -------------------------------------------------------------------------------------
+# Technical settings. The webhook URLs come from GitHub secrets (MAKE_WEBHOOK_URL, MAKE_STATUS_WEBHOOK_URL);
+# the values here are only used when the secrets are not set.
+# -------------------------------------------------------------------------------------
+scraper: {mode: docker, binary_path: "", depth: 3, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m}
+enrich: {mx_check: true, check_robots: true}
+paths: {out: out/cloud, state: state/cloud}
+sheet:
+  make_webhook_url: ""          # appends rows to a tab (scenario "POS Leads: Sheet receiver")
+  make_status_webhook_url: ""   # writes a range, used for the status cell and the Lists tab (scenario "POS Leads: write range")
+  tabs: {new_leads: "New Leads", master: "Master", rejected: "Rejected", run_log: "Run Log"}

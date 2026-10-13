@@ -1,0 +1,106 @@
+name: Leads
+
+on:
+  workflow_dispatch:
+    inputs:
+      category:
+        description: "Category name, several separated by commas, or ALL"
+        required: false
+        default: "ALL"
+      city:
+        description: "City (for example Toronto ON) or ALL"
+        required: false
+        default: "ALL"
+      min_score:
+        description: "Minimum score (70 is the default)"
+        required: false
+        default: "70"
+      run_id:
+        description: "Run id (the Google Sheet fills this in)"
+        required: false
+        default: ""
+      provider_complaints:
+        description: "Also read bad reviews about POS, payment and website providers"
+        type: boolean
+        required: false
+        default: false
+  # Optional automatic runs: remove the # at the start of the next 3 lines (times are UTC).
+  # schedule:
+  #   - cron: "0 12 * * 1-5"
+
+# Only one run at a time, so the Master list is never written by two runs at once.
+concurrency:
+  group: leads
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+      MAKE_STATUS_WEBHOOK_URL: ${{ secrets.MAKE_STATUS_WEBHOOK_URL }}
+      GOOGLE_CSE_KEY: ${{ secrets.GOOGLE_CSE_KEY }}
+      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+      IN_CATEGORY: ${{ inputs.category }}
+      IN_CITY: ${{ inputs.city }}
+      IN_MIN_SCORE: ${{ inputs.min_score }}
+      IN_RUN_ID: ${{ inputs.run_id }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Get the code and the saved state
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install packages
+        run: pip install -r requirements.txt
+
+      - name: Pull the free Google Maps scraper
+        run: docker pull gosom/google-maps-scraper
+
+      - name: Find leads
+        run: >
+          python run_cloud.py run
+          --category "${IN_CATEGORY:-ALL}"
+          --city "${IN_CITY:-ALL}"
+          --min-score "${IN_MIN_SCORE:-70}"
+          --run-id "${IN_RUN_ID:-gh-${{ github.run_id }}}"
+
+      - name: Provider complaints (optional)
+        if: ${{ inputs.provider_complaints }}
+        run: python run_extra.py --only providers --push
+
+      - name: Save the Master list back to the repository
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          if git diff --cached --quiet; then
+            echo "No state change"
+          else
+            git commit -m "Update lead state [skip ci]"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Tell the Sheet the run failed
+        if: failure()
+        run: python run_cloud.py status --state Failed --detail "See the GitHub Actions log" --run-id "${IN_RUN_ID:-gh-${{ github.run_id }}}"
+
+      - name: Keep the result files for 14 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leads-files
+          path: out/
+          retention-days: 14
+          if-no-files-found: ignore

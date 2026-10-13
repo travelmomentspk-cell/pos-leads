@@ -1,0 +1,8 @@
+out/
+logs/
+__pycache__/
+*.pyc
+backup_before_v4_*/
+v4_update/
+v5_update/
+.env

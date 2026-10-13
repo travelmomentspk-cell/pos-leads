@@ -1,0 +1,105 @@
+# =====================================================================================
+# EXTRA SOURCES CONFIG  (the only file you need to edit for run_extra.py)
+#   py run_extra.py              both sources
+#   py run_extra.py --only types / --only providers
+# The existing Canada pipeline (run_daily.py) is not touched by anything in here.
+# =====================================================================================
+
+market:
+  cities: [Toronto ON, Mississauga ON, Brampton ON, Ottawa ON, Hamilton ON, London ON, Montreal QC, Quebec City QC,
+           Vancouver BC, Surrey BC, Burnaby BC, Calgary AB, Edmonton AB, Winnipeg MB, Saskatoon SK, Halifax NS]
+  queries_per_run: 20        # business-type searches per run (each run moves on to new ones)
+  daily_cap: 100             # most business-type leads saved per run
+
+# -------------------------------------------------------------------------------------
+# SOURCE 1: 15 new business types. Edit keywords freely, set enabled: false to switch a type off,
+# or copy a line to add a type. `needs` = what you can pitch them.
+# -------------------------------------------------------------------------------------
+business_types:
+  - {id: printing_3d,   name: "3D printing shops",               enabled: true, keywords: ["3D printing service", "3D printing shop"],            needs: [Website, Payment gateway, CRM]}
+  - {id: boutiques,     name: "Boutiques and gift shops",        enabled: true, keywords: ["women's clothing boutique", "gift shop"],             needs: [POS, Website, Payment gateway]}
+  - {id: clinics,       name: "Clinics",                         enabled: true, keywords: ["walk-in clinic", "dental clinic", "physiotherapy clinic"], needs: [CRM, Website, Payment gateway]}
+  - {id: gyms,          name: "Gyms and fitness studios",        enabled: true, keywords: ["gym", "yoga studio", "pilates studio"],               needs: [CRM, POS, Payment gateway]}
+  - {id: salons_spas,   name: "Salons and spas",                 enabled: true, keywords: ["nail salon", "day spa", "lash studio"],               needs: [POS, CRM, Website]}
+  - {id: ghost_kitchens, name: "Cloud and ghost kitchens",       enabled: true, keywords: ["ghost kitchen", "cloud kitchen", "meal prep service"], needs: [POS, Website, Payment gateway]}
+  - {id: pharmacies,    name: "Independent pharmacies",          enabled: true, keywords: ["independent pharmacy", "compounding pharmacy"],       needs: [POS, CRM]}
+  - {id: pet_services,  name: "Pet services",                    enabled: true, keywords: ["pet grooming", "pet store"],                          needs: [POS, CRM, Website]}
+  - {id: auto_services, name: "Auto repair and detailing",       enabled: true, keywords: ["auto repair shop", "car detailing", "tire shop"],     needs: [POS, CRM, Website]}
+  - {id: florists,      name: "Florists",                        enabled: true, keywords: ["florist", "flower shop"],                             needs: [POS, Website, Payment gateway]}
+  - {id: specialty_food, name: "Specialty food shops",           enabled: true, keywords: ["butcher shop", "health food store", "cheese shop"],   needs: [POS, Website]}
+  - {id: vape_smoke,    name: "Vape and smoke shops",            enabled: true, keywords: ["vape shop", "smoke shop"],                            needs: [POS, Payment gateway]}
+  - {id: home_services, name: "Cleaning and home services",      enabled: true, keywords: ["cleaning service", "landscaping company", "home renovation contractor"], needs: [CRM, Website, Payment gateway]}
+  - {id: studios,       name: "Tattoo and photo studios",        enabled: true, keywords: ["tattoo studio", "photography studio"],                needs: [CRM, Website, Payment gateway]}
+  - {id: tutoring,      name: "Tutoring, music and driving schools", enabled: true, keywords: ["tutoring center", "music school", "driving school"], needs: [CRM, Website, Payment gateway]}
+
+# Scoring for source 1 (0-100). A lead also needs at least one real sign of need when require_need_signal is true:
+# no proper website (or only a Facebook/Instagram page) or a dated website.
+scoring:
+  min_score: 45
+  require_need_signal: true
+  max_review_count: 1500          # more reviews than this = too big or chain-like
+  min_review_count_for_website_gap: 10
+  weights: {business_type_fit: 20, phone: 10, email: 10, no_proper_website: 15, dated_website: 10, active_business: 5}
+exclude_chains: []                # extra names to skip, on top of chains.txt
+
+# -------------------------------------------------------------------------------------
+# SOURCE 2: PAIN SIGNALS FROM PROVIDER REVIEWS. We search Google Maps for POS, payment, website,
+# marketing and bookkeeping providers, and read the bad reviews that their business customers
+# left about them (hidden fees, terminals that stop working, bad support, contract traps ...).
+# Each complaint is a lead to research: the reviewer's name and public profile link, never a phone or email.
+# -------------------------------------------------------------------------------------
+complaints:
+  enabled: true
+  reviews_mode: sample           # sample = the 3 to 8 reviews Google shows per listing (tested format)
+                                 # extended = many more reviews, needs JSON output (format NOT tested, try 1 query first)
+  provider_queries_per_run: 24
+  max_rating: 2                  # only reviews with this many stars or fewer
+  max_age_months: 24             # only reviews newer than this
+  provider_cities: [Toronto ON, Calgary AB, Montreal QC, Ottawa ON, Vancouver BC]   # used with provider_names
+  provider_names:                # providers searched by name (edit freely)
+    - Moneris
+    - Global Payments Canada
+    - TD Merchant Services
+    - Helcim
+    - Lightspeed
+    - Shopify
+    - Elavon Canada
+    - Clover merchant services
+    - GoDaddy
+    - Wix
+  provider_keywords:             # local providers searched with every city in market.cities
+    - {kind: "POS & payments",     keywords: ["merchant services", "payment processing", "point of sale systems"]}
+    - {kind: "Website",            keywords: ["web design company", "website developer"]}
+    - {kind: "CRM & marketing",    keywords: ["digital marketing agency", "social media marketing agency", "CRM consultant"]}
+    - {kind: "Bookkeeping",        keywords: ["bookkeeping service", "small business accountant"]}
+  # What counts as a complaint. A phrase matches whole words, any letter case. English and French both work.
+  topics:
+    - topic: "Hidden fees or pricing"
+      phrases: [hidden fee, hidden fees, hidden charges, overcharged, over charged, charged me, unexpected fees, junk fees, statement fee, pci fee, monthly fee, rates went up, price increase, frais cachés]
+    - topic: "Terminal or system not working"
+      phrases: [terminal stopped, terminal not working, terminal broke, terminal keeps, machine broke, machine stopped, system crashed, system down, stopped working, keeps freezing, glitchy, outage, ne fonctionne pas, ne fonctionne plus]
+    - topic: "Poor support"
+      phrases: [no support, bad support, terrible support, poor support, worst support, customer service, never called back, no one answered, nobody answered, no response, on hold, ghosted, unresponsive, runaround, service à la clientèle]
+    - topic: "Contract or cancellation trap"
+      phrases: [cancellation fee, early termination, termination fee, locked in, locked me, equipment lease, leased, auto renew, auto-renew, couldn't cancel, can't cancel, cannot cancel, wouldn't let me cancel, annuler, frais d'annulation]
+    - topic: "Funds held or frozen"
+      phrases: [funds held, held my funds, held my money, frozen account, account frozen, froze my account, account was closed, shut down my account, deposit delayed, payout delayed, chargeback]
+    - topic: "Website or project not delivered"
+      phrases: [never finished, never delivered, not delivered, missed deadline, took months, abandoned, still not finished, website still, got hacked, wouldn't update, can't edit]
+    - topic: "Poor results or misleading"
+      phrases: [waste of money, no results, no leads, scam, ripped off, rip off, fraud, deceptive, misleading, bait and switch, didn't deliver, arnaque]
+  # Clues that the reviewer is a business owner, and words that make a reviewer NAME look like a business.
+  owner_clues: [my restaurant, our restaurant, my cafe, our cafe, my salon, our salon, my store, our store, my shop, our shop, my business, our business, my clinic, my gym, my bakery, my boutique, i own, we own, i run, we run, small business owner, business owner, as a small business]
+  business_name_words: [inc, ltd, corp, restaurant, cafe, bakery, salon, spa, shop, studio, clinic, store, boutique, bistro, grill, pizza, barber, dental, fitness, gym, kitchen, market, services]
+
+# -------------------------------------------------------------------------------------
+# Technical settings (the same free Google Maps scraper that Docker already runs)
+# -------------------------------------------------------------------------------------
+scraper: {mode: docker, binary_path: "", depth: 3, provider_depth: 2, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m}
+enrich: {enabled: true, workers: 8, timeout_seconds: 10, check_robots: true, mx_check: false}
+paths: {out: out/extra, state: state/extra}
+sheets:
+  push: false                    # true = also send results to Google Sheet tabs (create the tabs first)
+  leads_tab: Extra_Leads
+  complaints_tab: Provider_Complaints
+  make_webhook_url: "https://hook.us2.make.com/2jjal3nxdc9iux6nw4vvejhp2eb0nvfg"
