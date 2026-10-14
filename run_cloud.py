@@ -218,17 +218,17 @@ def pipeline(args, cfg, run_id, started):
     tabs = cfg["sheet"]["tabs"]
     if not args.no_push:
         if not leads_url:
-            print("WARNING: MAKE_WEBHOOK_URL is not set, so nothing was sent to the Sheet (files are in", out_dir, ")")
-        else:
-            cloud.push_rows(leads_url, tabs["new_leads"], cloud.NEW_LEAD_COLS, leads)
-            cloud.push_rows(leads_url, tabs["master"], cloud.MASTER_COLS, masters)
-            cloud.push_rows(leads_url, tabs["rejected"], cloud.REJECT_COLS, rejected[:300])
-            cloud.push_rows(leads_url, tabs["run_log"], cloud.RUNLOG_COLS, [runlog])
-            # only leads that really reached the Sheet are written into the Master list
+            # Never report Done when nothing reached the Sheet, and never remember leads that were not delivered.
+            raise RuntimeError("MAKE_WEBHOOK_URL is not set (GitHub secret). Nothing was sent to the Sheet and nothing was saved, so the run can simply be repeated.")
+        cloud.push_rows(leads_url, tabs["new_leads"], cloud.NEW_LEAD_COLS, leads)
+        cloud.push_rows(leads_url, tabs["master"], cloud.MASTER_COLS, masters)
+        cloud.push_rows(leads_url, tabs["rejected"], cloud.REJECT_COLS, rejected[:300])
+        cloud.push_rows(leads_url, tabs["run_log"], cloud.RUNLOG_COLS, [runlog])
+        # Only now, after every push succeeded, are the leads written into the Master list.
         for r in good:
             master.add("delivered", r["name"], r["phone"], r["website"], r["city"], r["place_id"])
         master.db.commit()
-    rcache.save()
+        rcache.save()
     return summary, final
 
 

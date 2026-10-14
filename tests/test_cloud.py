@@ -82,6 +82,41 @@ class Units(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class MissingWebhook(unittest.TestCase):
+    def test_missing_leads_webhook_fails_loudly_and_saves_nothing(self):
+        import os
+        hook = HTTPServer(("127.0.0.1", 0), Hook)
+        hook.captured = []
+        threading.Thread(target=hook.serve_forever, daemon=True).start()
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            header = ["input_id", "link", "title", "category", "address", "website", "phone", "review_count", "review_rating",
+                      "status", "place_id", "complete_address", "user_reviews", "emails"]
+            r = {h: "" for h in header}
+            r.update(input_id="c1", title="Some Cafe", category="Cafe", address="1 King St, Toronto, ON M5V 2T6, Canada",
+                     phone="416-555-0101", review_count="50", place_id="M1")
+            csvp = tmp / "r.csv"
+            with open(csvp, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=header); w.writeheader(); w.writerow(r)
+            cfgtext = (ROOT / "config_cloud.yaml").read_text(encoding="utf-8")
+            cfgtext = cfgtext.replace("out: out/cloud", f"out: {tmp / 'out'}").replace("state: state/cloud", f"state: {tmp / 'state'}")
+            (tmp / "cfg.yaml").write_text(cfgtext, encoding="utf-8")
+            env = {k: v for k, v in os.environ.items() if k not in ("MAKE_WEBHOOK_URL", "GOOGLE_CSE_KEY", "GOOGLE_CSE_CX")}
+            env["MAKE_STATUS_WEBHOOK_URL"] = f"http://127.0.0.1:{hook.server_port}/s"
+            res = subprocess.run([sys.executable, str(ROOT / "run_cloud.py"), "--config", str(tmp / "cfg.yaml"), "run", "--csv", str(csvp),
+                                  "--no-enrich", "--run-id", "t9"], capture_output=True, text=True, cwd=ROOT, env=env, encoding="utf-8")
+            self.assertNotEqual(res.returncode, 0)
+            self.assertIn("MAKE_WEBHOOK_URL is not set", res.stdout + res.stderr)
+            last = [p for p in hook.captured if p["range"] == "Control!B8:B11"][-1]
+            rows = json.loads(last["rows_json"])
+            self.assertEqual(rows[0], ["Failed"])
+            self.assertIn("MAKE_WEBHOOK_URL", rows[1][0])
+            self.assertFalse((tmp / "state" / "rejected_cache.json").exists())     # nothing remembered
+        finally:
+            hook.shutdown()
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class Site(BaseHTTPRequestHandler):
     OLD = ("<html><head><title>x</title></head><body>&copy; 2016 <a href='/{b}/about'>About</a> "
            "<a href='https://www.facebook.com/{b}'>fb</a> We're hiring a cook! Visit us.</body></html>")
