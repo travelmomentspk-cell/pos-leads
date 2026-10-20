@@ -47,6 +47,24 @@ def lead(**kw):
     return d
 
 
+class NameFalsePositives(unittest.TestCase):
+    """Real mistakes seen in the first live runs."""
+    def test_job_title_is_not_a_name(self):
+        self.assertIsNone(find_decision_maker([("u", "Certified Pilates Instructor, Owner")], "Trinity Pilates"))
+        self.assertIsNone(find_decision_maker([("u", "Senior Fitness Trainer - Founder")], "X"))
+
+    def test_greeting_next_to_a_name_is_dropped(self):
+        r = find_decision_maker([("u", "Founder: Vanessa Vakharia Hi there")], "The Math Guru")
+        self.assertEqual(r["name"], "Vanessa Vakharia")
+        r = find_decision_maker([("u", "Anita Ivic, Founder")], "Imprint Pilates")
+        self.assertEqual(r["name"], "Anita Ivic")
+
+    def test_team_pages_are_followed(self):
+        from leadlib.enrich import _contact_links
+        links = _contact_links("http://x.ca/", '<a href="/our-team">t</a><a href="/meet-the-owner">m</a><a href="/menu">menu</a><a href="/about-us">a</a>')
+        self.assertEqual(sorted(l.rsplit("/", 1)[1] for l in links), ["about-us", "meet-the-owner", "our-team"])
+
+
 class QualityUnit(unittest.TestCase):
     def test_titles(self):
         self.assertEqual(classify_title("Co-Owner")[0], "Owner")

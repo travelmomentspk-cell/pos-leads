@@ -222,7 +222,8 @@ def pipeline(args, cfg, run_id, started):
             raise RuntimeError("MAKE_WEBHOOK_URL is not set (GitHub secret). Nothing was sent to the Sheet and nothing was saved, so the run can simply be repeated.")
         cloud.push_rows(leads_url, tabs["new_leads"], cloud.NEW_LEAD_COLS, leads)
         cloud.push_rows(leads_url, tabs["master"], cloud.MASTER_COLS, masters)
-        cloud.push_rows(leads_url, tabs["rejected"], cloud.REJECT_COLS, rejected[:300])
+        near_misses = sorted(rejected, key=lambda x: -(x["Score"] if isinstance(x["Score"], (int, float)) else -1))
+        cloud.push_rows(leads_url, tabs["rejected"], cloud.REJECT_COLS, near_misses[:300])
         cloud.push_rows(leads_url, tabs["run_log"], cloud.RUNLOG_COLS, [runlog])
         # Only now, after every push succeeded, are the leads written into the Master list.
         for r in good:

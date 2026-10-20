@@ -107,11 +107,11 @@ def _contact_links(base_url, html_text):
     links = []
     for href in re.findall(r"href=[\"']([^\"'#]+)[\"']", html_text, flags=re.I):
         h = href.lower()
-        if any(k in h for k in ("contact", "about", "reach-us", "find-us")) and not h.startswith(("mailto:", "tel:")):
+        if any(k in h for k in ("contact", "about", "reach-us", "find-us", "team", "our-story", "story", "meet", "staff", "who-we-are", "owner", "founder", "people")) and not h.startswith(("mailto:", "tel:")):
             full = urljoin(base_url, href)
             if domain_of(full) == domain_of(base_url) and full not in links:
                 links.append(full)
-    return links[:2]
+    return links[:4]
 
 
 def _text_snippet(html_text, n=1200):

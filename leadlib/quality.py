@@ -29,7 +29,12 @@ NOT_NAME = {"our", "the", "team", "contact", "about", "meet", "welcome", "owner"
             "president", "staff", "chef", "home", "menu", "hours", "open", "call", "email", "story", "mission",
             "careers", "order", "online", "reserve", "book", "location", "locations", "info", "us", "and", "of",
             "restaurant", "cafe", "bakery", "salon", "shop", "store", "canada", "toronto", "inc", "ltd", "management",
-            "operated", "since", "family", "owned", "run", "local", "proudly", "serving", "locally", "years"}
+            "operated", "since", "family", "owned", "run", "local", "proudly", "serving", "locally", "years",
+            "certified", "instructor", "instructors", "trainer", "trainers", "therapist", "teacher", "teachers", "coach",
+            "coaches", "yoga", "pilates", "licensed", "registered", "senior", "head", "lead", "master", "personal",
+            "professional", "expert", "specialist", "technician", "mechanic", "stylist", "hi", "hello", "hey", "dear",
+            "thanks", "thank", "greetings", "bio", "biography", "fitness", "dental", "medical", "cleaning", "tutor",
+            "tutors", "school", "academy", "centre", "center", "services", "service", "solutions", "group", "team"}
 PATTERNS = [
     re.compile(rf"(?P<name>{NAME})(?:\s*[,|:(]\s*|\s+[-–—]\s+)(?:the\s+)?(?:[A-Za-z]+\s*(?:&|and|/)\s*)?(?P<title>{TITLE_WORDS})\b"),
     re.compile(rf"(?:(?i:our)\s+)?(?P<title>{TITLE_WORDS})\s*(?:[:|,]|\s[-–—]\s|(?i:\sis\s))\s*(?P<name>{NAME})"),

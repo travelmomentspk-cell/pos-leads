@@ -207,6 +207,8 @@ class EndToEnd(unittest.TestCase):
             self.assertIn("Hiring", names["Biz One Cafe"][7])
             self.assertEqual(len(lead_posts["New Leads"][0]), len(cloud.NEW_LEAD_COLS))
             self.assertEqual(len(lead_posts["Master"][0]), len(cloud.MASTER_COLS))
+            scores = [r[3] for r in lead_posts["Rejected"] if isinstance(r[3], (int, float))]
+            self.assertEqual(scores, sorted(scores, reverse=True))      # near misses come first
             reasons = {r[0]: r[2] for r in lead_posts["Rejected"]}
             self.assertIn("missing decision maker name, email", reasons["Biz Three Cafe"])
             self.assertEqual(reasons["Biz Five Cafe"].split(" (")[0], "missing email")   # owner found, but no email: Rejected
