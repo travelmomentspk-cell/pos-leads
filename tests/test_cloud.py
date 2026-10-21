@@ -22,20 +22,28 @@ CFG = extra.load_config(ROOT / "config_cloud.yaml")
 
 class Units(unittest.TestCase):
     def test_config_has_23_categories_and_lists(self):
-        self.assertEqual(len(CFG["categories"]), 23)
+        self.assertEqual(len(CFG["categories"]), 35)
         for c in CFG["categories"]:
             self.assertTrue(c["keywords"] and c["needs"] and c["name"])
         rows = run_cloud.lists_rows(CFG)
         self.assertEqual(rows[0], ["ALL", "ALL", 60])
         self.assertEqual(rows[1][0], "Restaurants")
         self.assertIn("3D printing shops", [r[0] for r in rows])
-        self.assertLessEqual(len(rows), 59)
+        self.assertEqual(len(rows), 59)                                 # always rewrites the whole A2:C60 block
+        self.assertEqual(rows[-1], ["", "", ""])
+        names = [r[0] for r in rows]
+        for new in ("Dry Cleaners & Laundry Services", "Shisha Lounges & Bars", "Billiards, Snooker & Gaming Zones"):
+            self.assertIn(new, names)
+        self.assertIn("Red Deer AB", [r[1] for r in rows])
 
     def test_pick(self):
         cats = CFG["categories"]
-        self.assertEqual(len(cloud.pick(cats, "ALL", lambda c: c["name"])), 23)
+        self.assertEqual(len(cloud.pick(cats, "ALL", lambda c: c["name"])), 35)
         self.assertEqual([c["name"] for c in cloud.pick(cats, "clinics, Florists", lambda c: c["name"])], ["Clinics", "Florists"])
         self.assertEqual(cloud.pick(CFG["cities"], "toronto on"), ["Toronto ON"])
+        # names that contain a comma must still be found as one name
+        for name in ("Billiards, Snooker & Gaming Zones", "Tutoring, music and driving schools"):
+            self.assertEqual([c["name"] for c in cloud.pick(cats, name, lambda c: c["name"])], [name])
 
     def test_clean_and_status_payload(self):
         sent = []

@@ -44,8 +44,8 @@ def lists_rows(cfg):
 
     def at(lst, i):
         return lst[i] if 0 <= i < len(lst) else ""
-    n = max(len(cats), len(cities), len(scores)) + 1
-    return [["ALL" if i == 0 else at(cats, i - 1), "ALL" if i == 0 else at(cities, i - 1), at(scores, i)] for i in range(n)]
+    n = max(59, max(len(cats), len(cities), len(scores)) + 1)
+    return [["ALL" if i == 0 else at(cats, i - 1), "ALL" if i == 0 else at(cities, i - 1), at(scores, i)] for i in range(min(n, 59))]
 
 
 def pipeline(args, cfg, run_id, started):

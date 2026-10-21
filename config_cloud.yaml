@@ -28,7 +28,7 @@ sources:
   provider_complaints: {enabled: false}                # bad reviews about POS/payment/website providers (config_extra.yaml)
 
 # -------------------------------------------------------------------------------------
-# 23 categories. keywords = what is typed into Google Maps, needs = what you can pitch.
+# 35 categories. keywords = what is typed into Google Maps, needs = what you can pitch.
 # Switch one off with enabled: false, or copy a line to add a category.
 # -------------------------------------------------------------------------------------
 categories:
@@ -55,9 +55,22 @@ categories:
   - {name: "Cleaning and home services",  enabled: true, keywords: ["cleaning service", "landscaping company", "home renovation contractor"], needs: [CRM, Website, Payment gateway]}
   - {name: "Tattoo and photo studios",    enabled: true, keywords: ["tattoo studio", "photography studio"],          needs: [CRM, Website, Payment gateway]}
   - {name: "Tutoring, music and driving schools", enabled: true, keywords: ["tutoring center", "music school", "driving school"], needs: [CRM, Website, Payment gateway]}
+  - {name: "Dry Cleaners & Laundry Services",       enabled: true, keywords: ["dry cleaner", "laundromat"],                          needs: [POS, CRM, Website]}
+  - {name: "Car Rentals & Chauffeur Services",      enabled: true, keywords: ["car rental", "chauffeur service"],                    needs: [CRM, Website, Payment gateway]}
+  - {name: "Catering & Event Management",           enabled: true, keywords: ["catering service", "event planner"],                  needs: [CRM, Website, Payment gateway]}
+  - {name: "Co-Working Spaces",                     enabled: true, keywords: ["coworking space"],                                    needs: [CRM, Website, Payment gateway]}
+  - {name: "Hardware & Construction Material",     enabled: true, keywords: ["hardware store", "building supply store"],            needs: [POS, Website]}
+  - {name: "Butcher Shops & Meat Boutiques",        enabled: true, keywords: ["halal butcher", "meat shop"],                         needs: [POS, Website]}
+  - {name: "Optical & Eyewear Stores",              enabled: true, keywords: ["optical store", "eyewear store"],                     needs: [POS, CRM, Website]}
+  - {name: "Toy Stores & Baby Product Shop",        enabled: true, keywords: ["toy store", "baby store"],                            needs: [POS, Website, Payment gateway]}
+  - {name: "Pet Grooming & Veterinary Clinics",    enabled: true, keywords: ["veterinary clinic", "animal hospital"],               needs: [CRM, Website, POS]}
+  - {name: "Indoor Play Areas & Trampoline Parks",  enabled: true, keywords: ["indoor playground", "trampoline park"],               needs: [POS, CRM, Website]}
+  - {name: "Billiards, Snooker & Gaming Zones",     enabled: true, keywords: ["pool hall", "gaming lounge", "arcade"],               needs: [POS, CRM]}
+  - {name: "Shisha Lounges & Bars",                 enabled: true, keywords: ["hookah lounge", "shisha lounge"],                     needs: [POS, Website]}
 
 cities: [Toronto ON, Mississauga ON, Brampton ON, Ottawa ON, Hamilton ON, London ON, Montreal QC, Quebec City QC,
-         Vancouver BC, Surrey BC, Burnaby BC, Calgary AB, Edmonton AB, Winnipeg MB, Saskatoon SK, Halifax NS]
+         Vancouver BC, Surrey BC, Burnaby BC, Calgary AB, Edmonton AB, Winnipeg MB, Saskatoon SK, Halifax NS,
+         Oshawa ON, Richmond BC, Victoria BC, Kelowna BC, Coquitlam BC, Langley BC, Laval QC, Gatineau QC, Regina SK, Red Deer AB]
 exclude_chains: []             # extra names to skip, on top of chains.txt
 score_choices: [60, 65, 70, 75, 80, 85, 90]    # the min-score dropdown in the Sheet
 

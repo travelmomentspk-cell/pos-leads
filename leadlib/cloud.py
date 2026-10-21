@@ -136,5 +136,8 @@ def pick(items, wanted, getter=lambda x: x):
     wanted = (wanted or "ALL").strip()
     if wanted.upper() == "ALL":
         return list(items)
+    exact = [i for i in items if getter(i).lower() == wanted.lower()]
+    if exact:  # a category name may itself contain a comma, so an exact match is checked first
+        return exact
     names = [w.strip().lower() for w in wanted.split(",") if w.strip()]
     return [i for i in items if getter(i).lower() in names or any(getter(i).lower().startswith(n) for n in names)]
