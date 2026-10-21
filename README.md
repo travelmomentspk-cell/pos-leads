@@ -69,3 +69,4 @@ Website visits respect robots.txt. Never share your Make webhook URL.
 - **`.github/workflows/leads.yml`**: runs the scraper on GitHub Actions (no laptop). Start it from the Sheet, from the Actions tab, or on a schedule.
 - **`apps_script/ControlPanel.gs`**: the Run button for the Sheet's Control tab.
 - Decision makers come from the business's own About/Team pages, schema.org data, and (optional) public LinkedIn snippets through Google's official Programmable Search API.
+- Cloud runs now search in 10-query batches, upload each batch's qualified leads to the Sheet, and continue until 50 new leads are delivered. Each completed batch checkpoints the duplicate and search-rotation state to GitHub; a repeat run skips leads already delivered. Runs stop after 270 minutes or when the selected searches are exhausted, and the Sheet status reports the final count.

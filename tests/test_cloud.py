@@ -7,6 +7,8 @@ import sys
 import tempfile
 import threading
 import unittest
+from argparse import Namespace
+from unittest import mock
 from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -122,6 +124,99 @@ class MissingWebhook(unittest.TestCase):
             self.assertFalse((tmp / "state" / "rejected_cache.json").exists())     # nothing remembered
         finally:
             hook.shutdown()
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TargetedBatches(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.args = Namespace(target_leads=50, csv=None)
+        self.cfg = {"run": {"target_leads_per_run": 50, "max_runtime_minutes": 10},
+                    "sources": {"linkedin_via_google_search": {"daily_budget": 80}},
+                    "paths": {"state": str(self.tmp / "state")}}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_continues_until_50_and_checkpoints_every_batch(self):
+        calls = []
+
+        def batch(args, cfg, run_id, started, seen, remaining, index, cse_budget):
+            calls.append((remaining, index, cse_budget))
+            count = min(20, remaining)
+            query = f"query-{index}"
+            seen.add(query)
+            return "batch complete", count, [query], 10
+
+        with mock.patch.object(run_cloud, "pipeline", side_effect=batch), \
+                mock.patch.object(run_cloud, "checkpoint_state") as checkpoint:
+            summary, delivered = run_cloud.run_batches(self.args, self.cfg, "test-run", "start")
+
+        self.assertEqual(delivered, 50)
+        self.assertIn("50/50", summary)
+        self.assertEqual(calls, [(50, 1, 80), (30, 2, 70), (10, 3, 60)])
+        self.assertEqual(checkpoint.call_count, 3)
+
+    def test_stops_when_searches_are_exhausted(self):
+        def batch(args, cfg, run_id, started, seen, remaining, index, cse_budget):
+            if index == 1:
+                seen.add("only-search")
+                return "batch complete", 7, ["only-search"], 0
+            return "no unused searches", 0, [], 0
+
+        with mock.patch.object(run_cloud, "pipeline", side_effect=batch), \
+                mock.patch.object(run_cloud, "checkpoint_state"):
+            summary, delivered = run_cloud.run_batches(self.args, self.cfg, "test-run", "start")
+
+        self.assertEqual(delivered, 7)
+        self.assertIn("all selected category/city searches have been used", summary)
+
+    def test_failed_batch_does_not_count_or_checkpoint_delivery(self):
+        def batch(args, cfg, run_id, started, seen, remaining, index, cse_budget):
+            if index == 1:
+                seen.add("first")
+                return "batch complete", 12, ["first"], 0
+            raise RuntimeError("Sheet delivery failed")
+
+        with mock.patch.object(run_cloud, "pipeline", side_effect=batch), \
+                mock.patch.object(run_cloud, "checkpoint_state") as checkpoint:
+            with self.assertRaisesRegex(RuntimeError, "Sheet delivery failed"):
+                run_cloud.run_batches(self.args, self.cfg, "test-run", "start")
+
+        checkpoint.assert_called_once_with()
+
+    def test_pending_master_rows_are_retried_before_search_resumes(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            state = tmp / "state"
+            state.mkdir()
+            pending = state / "pending_master_rows.json"
+            rows = [{"Business": "Already delivered"}]
+            pending.write_text(json.dumps(rows), encoding="utf-8")
+            cfg = {"sheet": {"tabs": {"master": "Master"}}}
+            with mock.patch.object(run_cloud.cloud, "push_rows", return_value=True) as push, \
+                    mock.patch.object(run_cloud, "checkpoint_state") as checkpoint:
+                run_cloud.flush_pending_master(cfg, state)
+
+            push.assert_called_once_with("", "Master", cloud.MASTER_COLS, rows)
+            checkpoint.assert_called_once_with()
+            self.assertFalse(pending.exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_failed_pending_master_upload_keeps_resume_record(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            state = tmp / "state"
+            state.mkdir()
+            pending = state / "pending_master_rows.json"
+            pending.write_text(json.dumps([{"Business": "Already delivered"}]), encoding="utf-8")
+            cfg = {"sheet": {"tabs": {"master": "Master"}}}
+            with mock.patch.object(run_cloud.cloud, "push_rows", side_effect=RuntimeError("Sheet offline")):
+                with self.assertRaisesRegex(RuntimeError, "Sheet offline"):
+                    run_cloud.flush_pending_master(cfg, state)
+            self.assertTrue(pending.exists())
+        finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
 

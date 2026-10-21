@@ -8,8 +8,10 @@ run:
   default_category: ALL        # a category name from the list below, several separated by commas, or ALL
   default_city: ALL            # a city from the list below, or ALL
   min_score: 70                # a lead below this score is rejected and never reaches the Sheet
+  target_leads_per_run: 50     # continue in search batches until this many new leads are delivered
+  max_runtime_minutes: 270     # stop with time remaining before the 330-minute Actions job limit
   daily_cap: 1000              # ceiling per run only; real volume depends on how many businesses pass the rules
-  queries_per_run: 40          # Google Maps searches per run when category or city is ALL (a GitHub run may last up to ~5 hours)
+  queries_per_run: 10          # per-batch searches; screen, upload and checkpoint before the next batch
   max_review_count: 1500       # more Google reviews than this = too big or chain-like
   rejected_retry_days: 14      # a rejected business is not looked at again for this many days
 
