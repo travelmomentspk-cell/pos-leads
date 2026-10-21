@@ -263,6 +263,8 @@ def checkpoint_state():
     """Persist completed batches on the Actions branch so an interrupted run can resume safely."""
     if os.environ.get("GITHUB_ACTIONS") != "true":
         return
+    subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+    subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
     subprocess.run(["git", "add", "state"], check=True)
     staged = subprocess.run(["git", "diff", "--cached", "--quiet", "--", "state"], check=False)
     if staged.returncode == 0:

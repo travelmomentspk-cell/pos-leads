@@ -219,6 +219,25 @@ class TargetedBatches(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_checkpoint_configures_git_identity_before_commit(self):
+        calls = []
+
+        def git(*args, **kwargs):
+            calls.append(args[0])
+            if args[0][:4] == ["git", "diff", "--cached", "--quiet"]:
+                return subprocess.CompletedProcess(args[0], 1)
+            return subprocess.CompletedProcess(args[0], 0)
+
+        with mock.patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}), \
+                mock.patch.object(run_cloud.subprocess, "run", side_effect=git):
+            run_cloud.checkpoint_state()
+
+        name_config = ["git", "config", "user.name", "github-actions[bot]"]
+        email_config = ["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"]
+        commit = ["git", "commit", "-m", "Checkpoint lead run state [skip ci]"]
+        self.assertLess(calls.index(name_config), calls.index(commit))
+        self.assertLess(calls.index(email_config), calls.index(commit))
+
 
 class Site(BaseHTTPRequestHandler):
     OLD = ("<html><head><title>x</title></head><body>&copy; 2016 <a href='/{b}/about'>About</a> "
