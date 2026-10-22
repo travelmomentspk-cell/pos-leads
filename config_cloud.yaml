@@ -18,7 +18,7 @@ run:
 quality:
   require_decision_maker: true   # Owner, Founder, CEO, President, Director or Manager, with a name
   require_phone: true            # a valid Canadian phone number
-  require_email: true            # a usable email (found on their own website or by the Maps scraper)
+  require_email: true            # a usable email found by the bounded website enrichment
   # A lead missing any required item is NOT written to New Leads. It goes to the Rejected tab with the reason.
 
 sources:
@@ -80,7 +80,7 @@ score_choices: [60, 65, 70, 75, 80, 85, 90]    # the min-score dropdown in the S
 # Technical settings. The webhook URLs come from GitHub secrets (MAKE_WEBHOOK_URL, MAKE_STATUS_WEBHOOK_URL);
 # the values here are only used when the secrets are not set.
 # -------------------------------------------------------------------------------------
-scraper: {mode: docker, binary_path: "", depth: 3, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m, timeout_seconds: 1200}
+scraper: {mode: docker, binary_path: "", depth: 3, concurrency: 4, email: false, lang: en, exit_on_inactivity: 3m, timeout_seconds: 1200}
 enrich: {mx_check: true, check_robots: true}
 paths: {out: out/cloud, state: state/cloud}
 sheet:

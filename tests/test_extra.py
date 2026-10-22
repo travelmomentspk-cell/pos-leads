@@ -31,6 +31,7 @@ class Config(unittest.TestCase):
     def test_fifteen_types(self):
         t = CFG["business_types"]
         self.assertEqual(len(t), 15)
+        self.assertFalse(CFG["scraper"]["email"])
         self.assertEqual(len({x["id"] for x in t}), 15)
         for x in t:
             self.assertTrue(x["keywords"] and x["needs"] and x["name"], x)

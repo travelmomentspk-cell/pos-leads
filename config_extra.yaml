@@ -95,7 +95,7 @@ complaints:
 # -------------------------------------------------------------------------------------
 # Technical settings (the same free Google Maps scraper that Docker already runs)
 # -------------------------------------------------------------------------------------
-scraper: {mode: docker, binary_path: "", depth: 3, provider_depth: 2, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m, timeout_seconds: 1200}
+scraper: {mode: docker, binary_path: "", depth: 3, provider_depth: 2, concurrency: 4, email: false, lang: en, exit_on_inactivity: 3m, timeout_seconds: 1200}
 enrich: {enabled: true, workers: 8, timeout_seconds: 10, check_robots: true, mx_check: false}
 paths: {out: out/extra, state: state/extra}
 sheets:

@@ -25,6 +25,7 @@ CFG = extra.load_config(ROOT / "config_cloud.yaml")
 class Units(unittest.TestCase):
     def test_config_has_23_categories_and_lists(self):
         self.assertEqual(len(CFG["categories"]), 35)
+        self.assertFalse(CFG["scraper"]["email"])
         for c in CFG["categories"]:
             self.assertTrue(c["keywords"] and c["needs"] and c["name"])
         rows = run_cloud.lists_rows(CFG)
@@ -141,12 +142,13 @@ class ScraperTimeout(unittest.TestCase):
                 mock.patch.object(scraper.shutil, "which", return_value="docker"), \
                 mock.patch.object(scraper.subprocess, "run", side_effect=run):
             with self.assertRaisesRegex(RuntimeError, "exceeded its 1-second timeout"):
-                scraper.run_scraper({"scraper": {"mode": "docker", "timeout_seconds": 1}},
+                scraper.run_scraper({"scraper": {"mode": "docker", "timeout_seconds": 1, "email": False}},
                                     Path(tmp) / "queries.txt", tmp, "results.csv", 3)
 
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0][1]["timeout"], 1)
         self.assertIn("--name", calls[0][0])
+        self.assertNotIn("-email", calls[0][0])
         self.assertEqual(calls[1][0][:2], ["docker", "kill"])
 
 
