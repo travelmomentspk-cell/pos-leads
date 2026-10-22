@@ -95,11 +95,11 @@ complaints:
 # -------------------------------------------------------------------------------------
 # Technical settings (the same free Google Maps scraper that Docker already runs)
 # -------------------------------------------------------------------------------------
-scraper: {mode: docker, binary_path: "", depth: 3, provider_depth: 2, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m}
+scraper: {mode: docker, binary_path: "", depth: 3, provider_depth: 2, concurrency: 4, email: true, lang: en, exit_on_inactivity: 3m, timeout_seconds: 1200}
 enrich: {enabled: true, workers: 8, timeout_seconds: 10, check_robots: true, mx_check: false}
 paths: {out: out/extra, state: state/extra}
 sheets:
   push: false                    # true = also send results to Google Sheet tabs (create the tabs first)
   leads_tab: Extra_Leads
   complaints_tab: Provider_Complaints
-  make_webhook_url: "https://hook.us2.make.com/2jjal3nxdc9iux6nw4vvejhp2eb0nvfg"
+  make_webhook_url: ""

@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import subprocess
+import uuid
 from pathlib import Path
 
 from .validate import PROVINCES, is_canadian, parse_postal, province_from_text
@@ -17,6 +18,9 @@ def write_queries(queries, path):
 
 def run_scraper(cfg, queries_path, out_dir, results_name, depth):
     s = cfg["scraper"]
+    timeout_seconds = int(s.get("timeout_seconds", 1800))
+    if timeout_seconds < 1:
+        raise ValueError("scraper.timeout_seconds must be at least 1")
     out_dir = Path(out_dir).resolve()
     queries_path = Path(queries_path).resolve()
     results = out_dir / results_name
@@ -26,6 +30,7 @@ def run_scraper(cfg, queries_path, out_dir, results_name, depth):
              "-exit-on-inactivity", str(s.get("exit_on_inactivity", "3m")), "-lang", s.get("lang", "en")]
     if s.get("email", True):
         flags.append("-email")
+    container_name = None
     if s.get("mode", "docker") == "binary":
         if not s.get("binary_path"):
             raise RuntimeError("scraper.mode is 'binary' but scraper.binary_path is empty in config.yaml")
@@ -36,11 +41,28 @@ def run_scraper(cfg, queries_path, out_dir, results_name, depth):
                 "Docker was not found. Install Docker Desktop (free), or download the scraper binary from "
                 "https://github.com/gosom/google-maps-scraper/releases and set scraper.mode: binary in config.yaml."
             )
-        cmd = ["docker", "run", "--rm", "-v", "gmaps-playwright-cache:/opt",
+        container_name = f"pos-leads-scraper-{uuid.uuid4().hex[:12]}"
+        cmd = ["docker", "run", "--rm", "--name", container_name, "-v", "gmaps-playwright-cache:/opt",
                "-v", f"{queries_path}:/queries.txt:ro", "-v", f"{out_dir}:/out",
                "gosom/google-maps-scraper", "-input", "/queries.txt", "-results", f"/out/{results_name}"] + flags
-    print("Running scraper:", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    print(f"Starting Google Maps scraper (timeout: {timeout_seconds}s)", flush=True)
+    try:
+        subprocess.run(cmd, check=True, timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        cleanup_error = ""
+        if container_name:
+            try:
+                cleanup = subprocess.run(["docker", "kill", container_name], capture_output=True, text=True,
+                                         timeout=15, check=False)
+                if cleanup.returncode and "no such container" not in cleanup.stderr.lower():
+                    cleanup_error = cleanup.stderr.strip() or f"docker kill exited {cleanup.returncode}"
+            except (OSError, subprocess.TimeoutExpired) as cleanup_exc:
+                cleanup_error = str(cleanup_exc)
+        detail = f"Google Maps scraper exceeded its {timeout_seconds}-second timeout"
+        if cleanup_error:
+            detail += f"; container cleanup also failed: {cleanup_error[:200]}"
+        raise RuntimeError(detail) from exc
+    print("Google Maps scraper finished", flush=True)
     return results
 
 

@@ -52,15 +52,16 @@ def push(cfg, tab, cols, rows):
     """Append rows to a tab. Preferred route: the Make webhook scenario (2 Make operations per call, any number of rows).
     Fallback: the Apps Script web app."""
     sh = cfg["sheets"]
+    make_webhook_url = os.environ.get("MAKE_WEBHOOK_URL") or sh.get("make_webhook_url")
     if not rows:
         return False
-    if sh.get("make_webhook_url"):
+    if make_webhook_url:
         for i in range(0, len(rows), 400):
             chunk = [[_plain(r.get(c, "")) for c in cols] for r in rows[i:i + 400]]
             payload = {"tab": tab, "rows_json": json.dumps(chunk, ensure_ascii=False)}
             for attempt in range(3):
                 try:
-                    resp = requests.post(sh["make_webhook_url"], json=payload, timeout=60)
+                    resp = requests.post(make_webhook_url, json=payload, timeout=60)
                     if resp.status_code == 200:
                         break
                     raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:120]}")
@@ -73,7 +74,7 @@ def push(cfg, tab, cols, rows):
     url = sh.get("web_app_url")
     token = os.environ.get("LEADS_TOKEN", "")
     if not url:
-        return False
+        raise RuntimeError("No Make webhook or Apps Script web app URL is configured; results were not sent.")
     if not token:
         raise RuntimeError("Set the LEADS_TOKEN environment variable to the same secret you put in the Apps Script.")
     for i in range(0, len(rows), 150):

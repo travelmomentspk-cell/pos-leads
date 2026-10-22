@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import run_cloud  # noqa: E402
-from leadlib import cloud, extra  # noqa: E402
+from leadlib import cloud, enrich, extra, scraper  # noqa: E402
 
 CFG = extra.load_config(ROOT / "config_cloud.yaml")
 
@@ -125,6 +125,54 @@ class MissingWebhook(unittest.TestCase):
         finally:
             hook.shutdown()
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+class ScraperTimeout(unittest.TestCase):
+    def test_docker_scraper_timeout_kills_its_container(self):
+        calls = []
+
+        def run(cmd, **kwargs):
+            calls.append((cmd, kwargs))
+            if cmd[:2] == ["docker", "run"]:
+                raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(scraper.shutil, "which", return_value="docker"), \
+                mock.patch.object(scraper.subprocess, "run", side_effect=run):
+            with self.assertRaisesRegex(RuntimeError, "exceeded its 1-second timeout"):
+                scraper.run_scraper({"scraper": {"mode": "docker", "timeout_seconds": 1}},
+                                    Path(tmp) / "queries.txt", tmp, "results.csv", 3)
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][1]["timeout"], 1)
+        self.assertIn("--name", calls[0][0])
+        self.assertEqual(calls[1][0][:2], ["docker", "kill"])
+
+
+class WebsiteTimeout(unittest.TestCase):
+    def test_slow_stream_is_abandoned_at_the_page_deadline(self):
+        import time
+
+        response = mock.MagicMock()
+        response.status_code = 200
+        response.headers = {"Content-Type": "text/html"}
+        response.url = "https://example.test/"
+        response.encoding = "utf-8"
+        response.__enter__.return_value = response
+
+        def chunks(_):
+            yield b"<html>"
+            time.sleep(0.02)
+            yield b"too late"
+
+        response.iter_content.side_effect = chunks
+        with mock.patch.object(enrich.requests, "get", return_value=response) as get:
+            self.assertIsNone(enrich._get("https://example.test/", 0.01, False))
+
+        self.assertLessEqual(get.call_args.kwargs["timeout"][0], 0.01)
+        self.assertLessEqual(get.call_args.kwargs["timeout"][1], 0.01)
+        response.__exit__.assert_called_once()
 
 
 class TargetedBatches(unittest.TestCase):

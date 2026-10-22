@@ -3,7 +3,8 @@ provider and online-ordering signals. Polite: robots.txt respected, short timeou
 import html as htmlmod
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -55,38 +56,70 @@ _robots_cache = {}
 _robots_lock = threading.Lock()
 
 
-def _robots_ok(url, timeout):
+def _remaining(timeout, deadline):
+    if deadline is None:
+        return timeout
+    return max(0, min(timeout, deadline - time.monotonic()))
+
+
+def _robots_ok(url, timeout, deadline=None):
+    if deadline is None:
+        deadline = time.monotonic() + timeout
     p = urlparse(url)
     base = f"{p.scheme}://{p.netloc}"
     with _robots_lock:
         rp = _robots_cache.get(base)
     if rp is None:
         rp = RobotFileParser()
-        try:
-            r = requests.get(base + "/robots.txt", headers={"User-Agent": UA}, timeout=min(timeout, 5))
-            rp.parse(r.text.splitlines() if r.status_code == 200 else [])
-        except Exception:  # noqa: BLE001
+        remaining = _remaining(timeout, deadline)
+        if remaining > 0:
+            try:
+                request_timeout = min(remaining, 5)
+                with requests.get(base + "/robots.txt", headers={"User-Agent": UA},
+                                  timeout=(request_timeout, request_timeout), stream=True) as r:
+                    data = bytearray()
+                    if r.status_code == 200:
+                        for chunk in r.iter_content(8192):
+                            if time.monotonic() >= deadline:
+                                break
+                            data.extend(chunk)
+                            if len(data) >= 262_144:
+                                break
+                    rp.parse(bytes(data).decode(r.encoding or "utf-8", errors="ignore").splitlines())
+            except requests.RequestException:
+                rp.parse([])
+        else:
             rp.parse([])
         with _robots_lock:
             _robots_cache[base] = rp
     return rp.can_fetch(UA, url)
 
 
-def _get(url, timeout, check_robots):
-    if check_robots and not _robots_ok(url, timeout):
+def _get(url, timeout, check_robots, deadline=None):
+    if deadline is None:
+        deadline = time.monotonic() + timeout
+    if _remaining(timeout, deadline) <= 0:
+        return None
+    if check_robots and not _robots_ok(url, timeout, deadline):
+        return None
+    remaining = _remaining(timeout, deadline)
+    if remaining <= 0:
         return None
     try:
-        r = requests.get(url, headers={"User-Agent": UA, "Accept-Language": "en-CA,en;q=0.8"},
-                         timeout=timeout, stream=True, allow_redirects=True)
-        if r.status_code >= 400 or "html" not in r.headers.get("Content-Type", "html").lower():
-            return None
-        data = b""
-        for chunk in r.iter_content(65536):
-            data += chunk
-            if len(data) >= MAX_BYTES:
-                break
-        return r.url, data.decode(r.encoding or "utf-8", errors="ignore")
-    except Exception:  # noqa: BLE001
+        request_timeout = min(remaining, 5)
+        with requests.get(url, headers={"User-Agent": UA, "Accept-Language": "en-CA,en;q=0.8"},
+                          timeout=(request_timeout, request_timeout), stream=True, allow_redirects=True) as r:
+            if r.status_code >= 400 or "html" not in r.headers.get("Content-Type", "html").lower():
+                return None
+            data = bytearray()
+            for chunk in r.iter_content(8192):
+                if _remaining(timeout, deadline) <= 0:
+                    return None
+                data.extend(chunk)
+                if len(data) >= MAX_BYTES:
+                    break
+            return r.url, bytes(data).decode(r.encoding or "utf-8", errors="ignore")
+    except requests.RequestException:
         return None
 
 
@@ -191,18 +224,20 @@ def _pick_email(emails, website):
     return pool[0] if pool else None
 
 
-def enrich_one(website, known_emails, timeout=10, check_robots=True):
+def enrich_one(website, known_emails, timeout=10, check_robots=True, deadline=None):
     res = {"email": None, "email_source_url": "", "emails": [], "pos_detected": [], "online_ordering": False,
            "cash_only": False, "snippet": "", "fetch_ok": False, "digital": {}, "pages": [], "people": []}
     if not website:
         return res
+    if deadline is None:
+        deadline = time.monotonic() + timeout * 5
     url = website if website.startswith("http") else "https://" + website
     pages = []
-    first = _get(url, timeout, check_robots)
+    first = _get(url, timeout, check_robots, deadline)
     if first:
         pages.append(first)
         for link in _contact_links(first[0], first[1]):
-            second = _get(link, timeout, check_robots)
+            second = _get(link, timeout, check_robots, deadline)
             if second:
                 pages.append(second)
     res["fetch_ok"] = bool(pages)
@@ -231,16 +266,24 @@ def enrich_one(website, known_emails, timeout=10, check_robots=True):
     return res
 
 
-def enrich_many(items, workers=8, timeout=10, check_robots=True):
+def enrich_many(items, workers=8, timeout=10, check_robots=True, deadline=None):
     """items: list of (key, website, known_emails). Returns {key: result}."""
     out = {}
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(enrich_one, w, k, timeout, check_robots): key for key, w, k in items}
-        for f, key in futs.items():
+        futs = {ex.submit(enrich_one, w, k, timeout, check_robots, deadline): key for key, w, k in items}
+        total = len(futs)
+        for completed, f in enumerate(as_completed(futs), start=1):
+            key = futs[f]
             try:
                 out[key] = f.result()
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 out[key] = {"email": None, "email_source_url": "", "emails": [], "pos_detected": [],
                             "online_ordering": False, "cash_only": False, "snippet": "", "fetch_ok": False,
                             "digital": {}, "pages": [], "people": []}
+                print(f"Website enrichment failed for site {completed}/{total}: {type(exc).__name__}: {exc}",
+                      flush=True)
+            if completed % 5 == 0 or completed == total:
+                reachable = sum(bool(item.get("fetch_ok")) for item in out.values())
+                print(f"Website enrichment progress: {completed}/{total} sites checked "
+                      f"({reachable} reachable, {completed - reachable} unavailable)", flush=True)
     return out

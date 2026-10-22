@@ -92,8 +92,8 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
         (out_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
         res = scraper.run_scraper(cfg, out_dir / "queries.txt", out_dir, "results.csv", cfg["sources"]["google_maps"].get("depth", 3))
         raw = extra.load_results(res)
-        rot_path.write_text(json.dumps(rotation))
     scraped = len(raw)
+    print(f"Scraper returned {scraped} records; starting lead qualification", flush=True)
 
     # ---------- 2. duplicates: Master list, businesses rejected recently, and repeats inside this batch ----------
     rejected, cands, dup = [], [], 0
@@ -139,6 +139,7 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
                  pages=[], people=[], pos_detected=[], online_ordering=False)
     todo = [r for r in cands if r["website"] and "/" not in extra.site_key(r["website"])]
     if wp.get("enabled", True) and not args.no_enrich and todo:
+        print(f"Checking {len(todo)} business websites for contact and quality signals", flush=True)
         res = enrich_mod.enrich_many([(i, r["website"], r["emails"]) for i, r in enumerate(todo)], wp.get("workers", 8),
                                      wp.get("timeout_seconds", 10), cfg["enrich"].get("check_robots", True))
         for i, r in enumerate(todo):
@@ -175,6 +176,7 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
     if cse_budget is not None:
         daily_budget = min(daily_budget, max(0, cse_budget))
     if lk.get("enabled", True) and key and cx and not args.no_cse:
+        print("Looking up public decision-maker snippets", flush=True)
         for r in sorted(cands, key=lambda x: -x["pre"]):
             if searched >= daily_budget:
                 break
@@ -188,6 +190,8 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
             if found:
                 r["dm"] = found
                 r["q"] = qlead(r)
+            if searched % 10 == 0:
+                print(f"Decision-maker search progress: {searched}/{daily_budget}", flush=True)
     good = []
     for r in cands:
         g = quality_gate(r["q"], {"min_score": min_score, "require_decision_maker": False})
@@ -229,7 +233,7 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
     export.write_csv(out_dir / "new_leads.csv", cloud.NEW_LEAD_COLS, leads)
     export.write_csv(out_dir / "rejected.csv", cloud.REJECT_COLS, rejected)
     summary = f"{scraped} scraped, {dup} duplicate, {len(rejected)} rejected, {final} final"
-    print(summary)
+    print(summary, flush=True)
     leads_url, status_url = urls(cfg)
     tabs = cfg["sheet"]["tabs"]
     if not args.no_push:
@@ -255,6 +259,8 @@ def pipeline(args, cfg, run_id, started, seen_queries=None, max_new_leads=None, 
         cloud.push_rows(leads_url, tabs["run_log"], cloud.RUNLOG_COLS, [runlog])
         if not leads:
             rcache.save()
+    if not args.csv:
+        rot_path.write_text(json.dumps(rotation))
     master.db.close()
     return summary, final, [q["text"] for q in queries] if not args.csv else [], searched
 
@@ -315,6 +321,7 @@ def run_batches(args, cfg, run_id, started):
             break
         batch_index += 1
         remaining_cse = max(0, int(cfg["sources"]["linkedin_via_google_search"].get("daily_budget", 80)) - searched)
+        print(f"Starting batch {batch_index}; target remaining: {target - delivered}", flush=True)
         last_summary, added, batch_queries, cse_used = pipeline(
             args, cfg, run_id, started, seen_queries, target - delivered, batch_index, remaining_cse)
         if not batch_queries and not args.csv:
@@ -323,14 +330,14 @@ def run_batches(args, cfg, run_id, started):
         delivered += added
         searched += cse_used
         checkpoint_state()
-        print(f"Progress: {delivered}/{target} new leads delivered; {batch_index} batch(es) completed")
+        print(f"Progress: {delivered}/{target} new leads delivered; {batch_index} batch(es) completed", flush=True)
         if args.csv:
             reason = "CSV input is a single batch"
             break
     if delivered < target and reason == "target reached":
         reason = "target not reached"
     result = f"{delivered}/{target} new leads delivered in {batch_index} batch(es); {reason}"
-    print(result)
+    print(result, flush=True)
     return result, delivered
 
 

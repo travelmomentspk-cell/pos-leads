@@ -7,11 +7,12 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from leadlib import extra  # noqa: E402
+from leadlib import export, extra  # noqa: E402
 
 CFG = extra.load_config(ROOT / "config_extra.yaml")
 NOW = datetime.now(timezone.utc)
@@ -45,6 +46,27 @@ class Config(unittest.TestCase):
         self.assertEqual(len(p1), CFG["complaints"]["provider_queries_per_run"])
         self.assertTrue(any("Moneris" in q["text"] for q in p1))
         self.assertEqual(pm[p1[0]["id"]]["kind"], "Named provider")
+
+    def test_make_secret_overrides_config_webhook(self):
+        response = mock.Mock(status_code=200)
+        with mock.patch.dict("os.environ", {"MAKE_WEBHOOK_URL": "http://127.0.0.1/mock-secret"}), \
+                mock.patch.object(export.requests, "post", return_value=response) as post, \
+                mock.patch.object(export.time, "sleep"):
+            self.assertTrue(export.push(
+                {"sheets": {"make_webhook_url": "http://old-config-url"}},
+                "Provider_Complaints", ["provider_name"], [{"provider_name": "Test Provider"}]))
+
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], "http://127.0.0.1/mock-secret")
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["tab"], "Provider_Complaints")
+        self.assertEqual(json.loads(payload["rows_json"]), [["Test Provider"]])
+
+    def test_requested_sheet_push_fails_if_no_endpoint_is_configured(self):
+        with mock.patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "results were not sent"):
+                export.push({"sheets": {}}, "Provider_Complaints", ["provider_name"],
+                            [{"provider_name": "Test Provider"}])
 
 
 class Complaints(unittest.TestCase):

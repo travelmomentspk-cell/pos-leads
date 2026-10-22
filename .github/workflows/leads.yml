@@ -50,6 +50,7 @@ jobs:
       IN_MIN_SCORE: ${{ inputs.min_score }}
       IN_RUN_ID: ${{ inputs.run_id }}
       PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: "1"
     steps:
       - name: Get the code and the saved state
         uses: actions/checkout@v4
@@ -67,6 +68,7 @@ jobs:
         run: docker pull gosom/google-maps-scraper
 
       - name: Find leads
+        timeout-minutes: 300
         run: >
           python run_cloud.py run
           --category "${IN_CATEGORY:-ALL}"
